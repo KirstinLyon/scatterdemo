@@ -18,7 +18,7 @@ library(janitor)
 # Define constants and parameters--------------------------------------------
 
 DATA <- "Data/Enhanced_Geographical_Analysis.txt"
-INDICATORS <- c( "TB_STAT_POS")
+INDICATORS <- c( "TB_STAT_POS", "TB_STAT")
 EXCLUDE_FISCAL_YEAR <- c("2016", "2017", "2018")
 SADC_COUNTRY <- c("Angola", 
                   "Botswana",
@@ -57,12 +57,13 @@ prep_data <- function(data){
         pivot_longer(cols = matches("results$"), names_to = "period", values_to = "value") |> 
         separate(period, into = c("fiscal_year", "period_type", "quarter", "misc"), sep = "_", fill = "right") |> 
         select(-c(period_type, misc)) |> 
-        
-        
         mutate(fiscal_year = str_remove(fiscal_year, "^x"),
                period = paste0(fiscal_year, " Q", quarter)
         ) |> 
-        select(-c(fiscal_year, quarter))
+        select(-c(fiscal_year, quarter)) |> 
+        rename(province = sub_national_unit_1,
+               district = sub_national_unit_2
+        ) 
     
     
     return(temp)
@@ -74,7 +75,10 @@ my_data <- read_tsv(DATA) |>
     filter(indicator %in% INDICATORS,
            country %in% SADC_COUNTRY,
            sub_national_unit_2 != "Data above SNU2"
-    ) |> 
+    ) |>
+    mutate(indicator = case_when(indicator == "TB_STAT" ~ paste(indicator, numerator_denominator, sep = "_"),
+                                   .default = indicator)
+           ) |> 
     select (-c(
         operating_unit, 
         iso3,
@@ -83,8 +87,8 @@ my_data <- read_tsv(DATA) |>
                sub_national_unit_2_uid,
                sub_national_unit_1_uid,
                sub_national_unit_3,
-        numerator_denominator,
-               modality
+               modality,
+               numerator_denominator,
     )) |> 
 
     group_by(country, indicator, sub_national_unit_1, sub_national_unit_2) |>
